@@ -1,69 +1,103 @@
+//Library untuk frekuensi
 #include <PWM.h>
 #include <Logger.h>
 #include <Arduino.h>
 #include <TimerOne.h>
 
-#define PIN_PWM 9
-#define TRIG_PIN 5
+//Library untuk RTC
+#include <Wire.h>
+#include <DS1307RTC.h>
 
-long frequency = 0;  // 10kHz
-int dutyCycle = 50;  // 50%
-float time = 0.001; 
-int kecepatan;
+#define ENA 12 //Input l298n (mengatur IN1)
+#define IN1 11 //Input l298n (mengatur IN3)
+#define ENB 8 //output A
+#define IN3 9 //output B
+
+long frequency = 0; //khz (ultrasonik)
+const int dutyCycle = 50; //50%
+tmElements_t tm;
 
 void setup() {
-  // Initialize serial communication 60000 -> 2 
   
   Serial.begin(9600);
-  Serial.println("Serial communication initialized.");
-  // Set Timer1 in Fast PWM mode with prescaler 1
-
-  pinMode(11, OUTPUT);
-  pinMode(12, OUTPUT);
-
-  // Turn off motors - Initial state
-  digitalWrite(12, LOW);
+  while (!Serial) ; // wait for serial
+  delay(200);
 
   // Initialize timers excluding TIMER0
   InitTimersSafe();
-  Serial.println("Timers initialized.");
+
+  // pinMode(IN1, OUTPUT);
+  // pinMode(IN3, OUTPUT);
+  // pinMode(ENB, OUTPUT);
+  // pinMode(ENA, OUTPUT);
 
   // Set PWM frequency and duty cycle
- 
-  SetPinFrequencySafe(11, frequency);  // Konversi ke Hz
-  SetPinFrequencySafe(9, frequency);
-  SetPinFrequencySafe(12, frequency);
-  //directionControl();
-  // kecepatan = map(sin(millis() * 0.001), -1, 1, 0, 255);
-  // analogWrite(11, kecepatan);
-  // Serial.print("kecepatan : " + kecepatan);
-  // directionControl();
+  // SetPinFrequencySafe(IN1, frequency);
+  // SetPinFrequencySafe(IN3, frequency);
+  // SetPinFrequencySafe(ENA, frequency);
+  // SetPinFrequencySafe(ENB, frequency);
 }
 
 void loop() {
-  directionControl();
+  getCurrentTime();
+  //directionControl(frequency);
+  delay(1000);
+}
+
+void getCurrentTime(){
+  if (RTC.read(tm)) {
+    String current_time = print2digits(tm.Hour) + ":" + print2digits(tm.Minute) + ":" + print2digits(tm.Second);
+    Serial.println("Waktu : " + current_time);
+
+    if (tm.Hour < 18) {
+      Serial.println("Frekuensi Untuk Burung");
+      frequency = 40000;
+      Serial.println(frequency);
+    } else {
+      Serial.println("Frekuensi Untuk Tikus");
+      frequency = 50000;
+      Serial.println(frequency);
+    }
+
+  } else {
+    if (RTC.chipPresent()) {
+      Serial.println("The DS1307 is stopped.  Please run the SetTime");
+      Serial.println("example to initialize the time and begin running.");
+      Serial.println();
+    } else {
+      Serial.println("DS1307 read error!  Please check the circuitry.");
+      Serial.println();
+    }
+    delay(9000);
+  }
+  delay(1000);
+}
+
+void directionControl(long frequency) {
   Serial.print("PWM frequency set to ");
   Serial.print(frequency);
   Serial.print(" Hz with duty cycle ");
   Serial.print(dutyCycle);
   Serial.println("%.");
   Serial.print("pin :");
-  Serial.println(PIN_PWM);
-}
 
-void directionControl() {
-  // Set motors to maximum speed
-  // For PWM, maximum possible values are 0 to 255
-  // analogWrite(11, kecepatan);
-  tone(11, frequency);
-  // pwmWrite(12, map(dutyCycle, 0, 100, 0, 4095));
+  //output
+  tone(IN1, frequency);
+  tone(IN3, frequency);
+
+  //Turn Off motor A & B
+  digitalWrite(ENA, LOW);
+  digitalWrite(ENB, LOW); 
 
   // Turn on motor A & B
-  digitalWrite(12, HIGH);
-  Serial.print(time);
+  digitalWrite(ENA, HIGH);
+  digitalWrite(ENB, HIGH);
+}
 
-  // delay(1000);
-
-  // Turn off motors
-  // digitalWrite(12, LOW);
+String print2digits(int number) {
+  if (number >= 0 && number < 10) {
+    return "0" + String(number);
+  } else {
+    return String(number);
+  }
 }
